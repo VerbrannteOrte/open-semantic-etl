@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-import shutil
-import tempfile
+
 import time
 import urllib.request
 import os
+import tempfile
+import shutil
 from lxml import etree
 from dateutil import parser as dateparser
 
@@ -36,12 +37,13 @@ class Connector_Web(Connector_File):
         self.config['uri_prefix'] = False
 
         # strip in facet path
-        self.config['facet_path_strip_prefix'] = ['http://www.',
-                                                  'http://',
-                                                  'https://www.',
-                                                  'https://',
-                                                  'ftp://'
-                                                  ]
+        self.config['facet_path_strip_prefix'] = [
+            'http://www.',
+            'http://',
+            'https://www.',
+            'https://',
+            'ftp://'
+        ]
 
         self.config['plugins'] = [
             'filter_blacklist',
@@ -56,7 +58,6 @@ class Connector_Web(Connector_File):
             'enhance_extract_hashtags',
             'clean_title',
             'enhance_multilingual',
-
         ]
 
     def read_configfiles(self):
@@ -110,11 +111,8 @@ class Connector_Web(Connector_File):
                 mtime = False
 
             try:
-                # parse datetime
                 mtime = dateparser.parse(mtimestring)
-                # convert datetime to time
                 mtime = mtime.timetuple()
-
             except BaseException as e:
                 print("Exception while reading last-modified from content: {}".format(e))
 
@@ -135,8 +133,7 @@ class Connector_Web(Connector_File):
         data = {}
 
         uri = uri.strip()
-        # if no protocol, add http://
-        if not uri.lower().startswith("http://") and not uri.lower().startswith("https://") and not uri.lower().startswith("ftp://") and not uri.lower().startswith("ftps://"):
+        if not uri.lower().startswith(("http://", "https://", "ftp://", "ftps://")):
             uri = 'http://' + uri
 
         parameters['id'] = uri
@@ -151,27 +148,26 @@ class Connector_Web(Connector_File):
 
         else:
 
-           if self.verbose:
-    print("Downloading {}".format(uri))
+            if self.verbose:
+                print("Downloading {}".format(uri))
 
-# Ersetze urlretrieve durch urlopen mit User-Agent
-request = urllib.request.Request(
-    uri,
-    headers={
-        "User-Agent": "Mozilla/5.0 (compatible; OpenSemanticSearch/1.0)",
-        "Accept": "text/html",
-        "Accept-Language": "de-DE,de;q=0.9"
-    }
-)
+            request = urllib.request.Request(
+                uri,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; OpenSemanticSearch/1.0)",
+                    "Accept": "text/html",
+                    "Accept-Language": "de-DE,de;q=0.9"
+                }
+            )
 
-with urllib.request.urlopen(request) as response:
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        shutil.copyfileobj(response, tmp)
-        tempfilename = tmp.name
-    headers = response.headers
+            with urllib.request.urlopen(request) as response:
+                with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                    shutil.copyfileobj(response, tmp)
+                    tempfilename = tmp.name
+                headers = response.headers
 
-if self.verbose:
-    print("Download done")
+            if self.verbose:
+                print("Download done")
 
         parameters['filename'] = tempfilename
 
@@ -180,30 +176,21 @@ if self.verbose:
         #
         mtime = False
 
-        # get meta "last-modified" from content
         mtime = self.read_mtime_from_html(tempfilename)
 
-        # use HTTP status modification time
         if not mtime:
             try:
-
                 last_modified = headers['last-modified']
 
                 if self.verbose:
                     print("HTTP Header Last-modified: {}".format(last_modified))
 
                 mtime = dateparser.parse(last_modified)
-                # convert datetime to time
                 mtime = mtime.timetuple()
-
-                if self.verbose:
-                    print("Parsed date: {}".format(mtime))
 
             except:
                 mtime = False
-                print("Failed to parse HTTP header last-modified")
 
-        # else HTTP create date
         if not mtime:
             try:
                 date = headers['date']
@@ -212,41 +199,25 @@ if self.verbose:
                     print("HTTP Header date: {}".format(date))
 
                 mtime = dateparser.parse(date)
-                # convert datetime to time
                 mtime = mtime.timetuple()
-
-                if self.verbose:
-                    print("Parsed date: {}".format(mtime))
 
             except:
                 mtime = False
-                print("Failed to parse HTTP header date")
 
-        # else now
         if not mtime:
             mtime = time.localtime()
 
         mtime_masked = time.strftime("%Y-%m-%dT%H:%M:%SZ", mtime)
-
         data['file_modified_dt'] = mtime_masked
 
-        # Enrich data and write to search index
         parameters, data = self.process(parameters=parameters, data=data)
 
         os.remove(tempfilename)
 
 
-#
-# If runned (not importet for functions) get parameters and start
-#
-
 if __name__ == "__main__":
 
-    # get uri or filename from args
-
     from optparse import OptionParser
-
-    # get uri or filename from args
 
     parser = OptionParser("etl-web [options] URL")
     parser.add_option("-q", "--quiet", dest="quiet", action="store_true",
@@ -269,23 +240,18 @@ if __name__ == "__main__":
 
     connector = Connector_Web()
 
-    # add optional config parameters
     if options.config:
         connector.read_configfile(options.config)
     if options.outputfile:
         connector.config['outputfile'] = options.outputfile
-
-    # set (or if config overwrite) plugin config
     if options.plugins:
         connector.config['plugins'] = options.plugins.split(',')
 
-    if options.verbose == False or options.verbose == True:
+    if options.verbose is not None:
         connector.verbose = options.verbose
-
-    if options.quiet == False or options.quiet == True:
+    if options.quiet is not None:
         connector.quiet = options.quiet
-
-    if options.force == False or options.force == True:
+    if options.force is not None:
         connector.config['force'] = options.force
 
     for uri in args:
