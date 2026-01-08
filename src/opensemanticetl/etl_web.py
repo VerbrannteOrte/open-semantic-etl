@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
-
+import shutil
+import tempfile
 import time
 import urllib.request
 import os
@@ -150,13 +151,27 @@ class Connector_Web(Connector_File):
 
         else:
 
-            if self.verbose:
-                print("Downloading {}".format(uri))
+           if self.verbose:
+    print("Downloading {}".format(uri))
 
-            tempfilename, headers = urllib.request.urlretrieve(uri)
+# Ersetze urlretrieve durch urlopen mit User-Agent
+request = urllib.request.Request(
+    uri,
+    headers={
+        "User-Agent": "Mozilla/5.0 (compatible; OpenSemanticSearch/1.0)",
+        "Accept": "text/html",
+        "Accept-Language": "de-DE,de;q=0.9"
+    }
+)
 
-            if self.verbose:
-                print("Download done")
+with urllib.request.urlopen(request) as response:
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        shutil.copyfileobj(response, tmp)
+        tempfilename = tmp.name
+    headers = response.headers
+
+if self.verbose:
+    print("Download done")
 
         parameters['filename'] = tempfilename
 
